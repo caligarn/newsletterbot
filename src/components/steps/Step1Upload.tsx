@@ -1,20 +1,42 @@
 'use client'
 
-import { useCallback } from 'react'
-import { useDropzone } from 'react-dropzone'
+import { useCallback, useState } from 'react'
+import { useDropzone, FileRejection } from 'react-dropzone'
 import StepShell from '../stepper/StepShell'
 
 interface Step1UploadProps {
   onFileAccepted: (text: string) => void
+  error?: string | null
 }
 
-export default function Step1Upload({ onFileAccepted }: Step1UploadProps) {
+export default function Step1Upload({ onFileAccepted, error: externalError }: Step1UploadProps) {
+  const [localError, setLocalError] = useState<string | null>(null)
+  const displayError = externalError || localError
+
   const onDrop = useCallback(
-    (acceptedFiles: File[]) => {
+    (acceptedFiles: File[], rejections: FileRejection[]) => {
+      setLocalError(null)
+
+      if (rejections.length > 0) {
+        setLocalError('Please upload a .txt file exported from WhatsApp.')
+        return
+      }
+
       const file = acceptedFiles[0]
       if (!file) return
+
       const reader = new FileReader()
-      reader.onload = () => onFileAccepted(reader.result as string)
+      reader.onload = () => {
+        const text = reader.result as string
+        if (!text || text.trim().length === 0) {
+          setLocalError('The file appears to be empty. Please try a different export.')
+          return
+        }
+        onFileAccepted(text)
+      }
+      reader.onerror = () => {
+        setLocalError('Failed to read the file. Please try again.')
+      }
       reader.readAsText(file)
     },
     [onFileAccepted]
@@ -22,8 +44,21 @@ export default function Step1Upload({ onFileAccepted }: Step1UploadProps) {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'text/plain': ['.txt'] },
+    // Accept .txt files with any MIME type (WhatsApp exports sometimes
+    // come through with no MIME or application/octet-stream)
+    accept: {
+      'text/plain': ['.txt'],
+      'application/octet-stream': ['.txt'],
+      'text/*': ['.txt'],
+    },
     maxFiles: 1,
+    // Also allow files by extension when MIME detection fails
+    validator: (file) => {
+      if (file.name && !file.name.toLowerCase().endsWith('.txt')) {
+        return { code: 'wrong-type', message: 'File must be a .txt file' }
+      }
+      return null
+    },
   })
 
   return (
@@ -110,6 +145,13 @@ export default function Step1Upload({ onFileAccepted }: Step1UploadProps) {
           )}
         </div>
       </div>
+
+      {/* Error message */}
+      {displayError && (
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {displayError}
+        </div>
+      )}
     </StepShell>
   )
 }

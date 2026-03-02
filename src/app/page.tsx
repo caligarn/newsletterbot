@@ -43,18 +43,25 @@ export default function Home() {
   const [parsedChat, setParsedChat] = useState<ParsedChat | null>(null)
   const [newsletter, setNewsletter] = useState<Newsletter | null>(null)
   const [generateError, setGenerateError] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
 
   function handleFileAccepted(text: string) {
+    setUploadError(null)
     try {
       const parsed = parseWhatsAppChat(text)
       if (parsed.messages.length === 0) {
+        setUploadError(
+          'No messages found in this file. Make sure it\'s a WhatsApp chat export — the file should have lines like "[1/1/25, 12:00:00] Name: message".'
+        )
         return
       }
       setParsedChat(parsed)
       sessionStorage.setItem('parsedChat', JSON.stringify(parsed))
       setCurrentStep(2)
     } catch {
-      // stay on step 1
+      setUploadError(
+        'Failed to parse the file. Please make sure this is a WhatsApp chat export (.txt).'
+      )
     }
   }
 
@@ -89,6 +96,7 @@ export default function Home() {
     setParsedChat(null)
     setNewsletter(null)
     setGenerateError(null)
+    setUploadError(null)
     setCurrentStep(1)
     sessionStorage.removeItem('parsedChat')
     sessionStorage.removeItem('newsletter')
@@ -129,7 +137,7 @@ export default function Home() {
       {/* Main content area */}
       <main className="flex-1 px-6 py-8 pb-24 lg:px-12 lg:pb-8">
         {currentStep === 1 && (
-          <Step1Upload onFileAccepted={handleFileAccepted} />
+          <Step1Upload onFileAccepted={handleFileAccepted} error={uploadError} />
         )}
 
         {currentStep === 2 && parsedChat && (
